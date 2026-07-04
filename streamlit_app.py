@@ -1100,18 +1100,20 @@ st.markdown(
 )
 
 tabs = st.tabs([
-    "오늘 경기 입력",
-    "모바일 전용 입력",
     "누적 랭킹보드",
+    "모바일 입력",
     "파트너/궁합 통계",
     "분기 스냅샷",
-    "원본 데이터 & 선수 관리"
+    "원본 데이터 & 선수 관리",
+    "PC 입력(오늘 경기)"
 ])
+# 인덱스 매핑: tabs[0]=누적 랭킹보드, tabs[1]=모바일 입력, tabs[2]=파트너/궁합,
+#              tabs[3]=분기 스냅샷, tabs[4]=원본 데이터, tabs[5]=PC 입력
 
 # =========================
-# 탭 1: 오늘 경기 입력
+# 탭: PC 입력(오늘 경기) — 맨 마지막 탭
 # =========================
-with tabs[0]:
+with tabs[5]:
     st.subheader("오늘 경기 입력 (안정 입력 모드)")
 
     colA, colB, colC, colD = st.columns([1, 1, 1, 2])
@@ -1368,9 +1370,9 @@ with tabs[1]:
             st.rerun()
 
 # =========================
-# 탭 3: 누적 랭킹보드
+# 탭: 누적 랭킹보드 — 첫 번째 탭
 # =========================
-with tabs[2]:
+with tabs[0]:
     st.subheader("누적 랭킹보드")
 
     if matches_df.empty:
@@ -1492,9 +1494,9 @@ with tabs[2]:
                 st.dataframe(promo_log_df.tail(200), use_container_width=True, hide_index=True)
 
 # =========================
-# 탭 4: 파트너/궁합 통계
+# 탭: 파트너/궁합 통계
 # =========================
-with tabs[3]:
+with tabs[2]:
     st.subheader("파트너별 승률 / 궁합 통계")
 
     if matches_df.empty:
@@ -1564,9 +1566,9 @@ with tabs[3]:
                 st.dataframe(sub_disp, use_container_width=True, hide_index=True)
 
 # =========================
-# 탭 5: 분기 스냅샷
+# 탭: 분기 스냅샷
 # =========================
-with tabs[4]:
+with tabs[3]:
     st.subheader("분기별 랭킹 스냅샷 저장")
 
     if matches_df.empty:
@@ -1609,9 +1611,9 @@ with tabs[4]:
                 st.download_button("선택 스냅샷 다운로드", data=fp, file_name=pick, mime="text/csv")
 
 # =========================
-# 탭 6: 원본 데이터 & 선수 관리
+# 탭: 원본 데이터 & 선수 관리
 # =========================
-with tabs[5]:
+with tabs[4]:
     st.subheader("원본 데이터 수정/삭제 & 선수 관리")
 
     st.markdown("## 경기 기록(matches.csv) 수정/삭제")
