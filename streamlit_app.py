@@ -1273,6 +1273,11 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("모바일 전용 입력 (한 게임씩 빠르게)")
 
+    # ✅ 직전 저장 성공 메시지 표시 (저장 후 rerun 되어도 유지)
+    _saved_msg = st.session_state.pop("mobile_saved_msg", None)
+    if _saved_msg:
+        st.success(_saved_msg)
+
     with st.form("mobile_form", clear_on_submit=False):
         mcol1, mcol2 = st.columns([1, 1])
         with mcol1:
@@ -1300,7 +1305,7 @@ with tabs[1]:
         with scol2:
             mlg = st.number_input("패배 게임", min_value=0, max_value=9, value=3, step=1, key="mlg")
 
-        submitted = st.form_submit_button("미리보기/저장")
+        submitted = st.form_submit_button("계산하고 바로 저장", type="primary")
 
     if submitted:
         problems = []
@@ -1320,48 +1325,47 @@ with tabs[1]:
         if problems:
             st.error("\n".join(problems))
         else:
+            # ✅ 제출 즉시 계산+저장 (기존의 '이 내용으로 저장' 중첩 버튼은
+            #    rerun 시 폼 제출 상태가 초기화되어 절대 실행되지 않는 버그였음)
             res = compute_points(grade_map[mw1], grade_map[mw2], grade_map[ml1], grade_map[ml2], int(mwg), int(mlg))
-            st.success(
-                f"승점(각자): {fmt2(res['final_win_pt'])} / 패점(각자): {fmt2(res['final_lose_pt'])} | "
-                f"팀급수합(승/패): {res['winner_team_points']}/{res['loser_team_points']} | "
-                f"스코어보너스(승자기준): {fmt2(res['score_bonus'])}"
+            row = {
+                "date": str(m_date),
+                "venue": m_venue,
+                "winner1": mw1, "winner2": mw2,
+                "loser1": ml1, "loser2": ml2,
+                "winner_games": int(mwg), "loser_games": int(mlg),
+                **res
+            }
+            new_df = pd.DataFrame([row])
+            all_df = pd.concat([matches_df, new_df], ignore_index=True) if not matches_df.empty else new_df
+            all_df = normalize_date_col(all_df)
+            save_matches(all_df)
+
+            if auto_grade_enabled:
+                updated_players, promo_logs = apply_auto_promo_demotion(
+                    players_df=players_df,
+                    matches_df=all_df,
+                    mode=promo_mode,
+                    min_matches=min_matches,
+                    promote_threshold=float(promote_threshold),
+                    demote_threshold=float(demote_threshold),
+                    window=promo_window
+                )
+                if promo_logs:
+                    save_players(updated_players)
+                    append_promo_log(promo_logs)
+                    players_df = updated_players
+
+            # ✅ 요약 엑셀 갱신
+            build_and_save_summary(players_df=load_players(), matches_df=all_df)
+
+            st.session_state["mobile_saved_msg"] = (
+                f"✅ 저장 완료! {mw1}/{mw2} 승 ({int(mwg)}-{int(mlg)}) — "
+                f"승점(각자): {fmt2(res['final_win_pt'])} / 패점(각자): {fmt2(res['final_lose_pt'])} "
+                f"(누적 {len(all_df)}게임)"
             )
-
-            if st.button("이 내용으로 저장", key="mobile_save_btn"):
-                row = {
-                    "date": str(m_date),
-                    "venue": m_venue,
-                    "winner1": mw1, "winner2": mw2,
-                    "loser1": ml1, "loser2": ml2,
-                    "winner_games": int(mwg), "loser_games": int(mlg),
-                    **res
-                }
-                new_df = pd.DataFrame([row])
-                all_df = pd.concat([matches_df, new_df], ignore_index=True) if not matches_df.empty else new_df
-                all_df = normalize_date_col(all_df)
-                save_matches(all_df)
-
-                if auto_grade_enabled:
-                    updated_players, promo_logs = apply_auto_promo_demotion(
-                        players_df=players_df,
-                        matches_df=all_df,
-                        mode=promo_mode,
-                        min_matches=min_matches,
-                        promote_threshold=float(promote_threshold),
-                        demote_threshold=float(demote_threshold),
-                        window=promo_window
-                    )
-                    if promo_logs:
-                        save_players(updated_players)
-                        append_promo_log(promo_logs)
-                        players_df = updated_players
-
-                # ✅ 요약 엑셀 갱신
-                build_and_save_summary(players_df=load_players(), matches_df=all_df)
-
-                st.success("저장 완료!")
-                st.cache_data.clear()
-                st.rerun()
+            st.cache_data.clear()
+            st.rerun()
 
 # =========================
 # 탭 3: 누적 랭킹보드
