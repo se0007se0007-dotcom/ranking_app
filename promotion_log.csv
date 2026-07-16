@@ -1,1 +1,2 @@
-﻿timestamp,name,from_grade,to_grade,rule_mode,rule_window,min_matches,metric_value,promote_threshold,demote_threshold,bucket,last_bucket,delta_bucket
+timestamp,name,from_grade,to_grade,rule_mode,rule_window,min_matches,metric_value,promote_threshold,demote_threshold,bucket,last_bucket,delta_bucket
+2026-07-16 23:44:12,배병운,4급,3급,점수,전체 누적,6,11.25,10.0,-10.0,1,0,1
