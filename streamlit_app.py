@@ -1,7 +1,7 @@
 import base64
 import io
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 import requests
 import streamlit as st
@@ -11,8 +11,14 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="JS 테니스 랭킹포인트", layout="wide")
 
+# ✅ 한국 시간(KST) 기준 오늘 날짜 (클라우드 서버는 UTC라서 필수)
+KST = timezone(timedelta(hours=9))
+
+def today_kst() -> date:
+    return datetime.now(KST).date()
+
 # ✅ 올해 연도(자동)
-THIS_YEAR = date.today().year
+THIS_YEAR = today_kst().year
 
 # ✅ 한글 입력 친화: 브라우저 자동변환/자동완성 차단 + IME 힌트
 #    - MutationObserver로 selectbox 검색창처럼 "동적으로 생기는" 입력창에도 즉시 적용
@@ -757,7 +763,7 @@ def board_to_png(board_disp: pd.DataFrame, title_text: str) -> tuple[bytes, int]
 
     # 제목/부제
     draw.text((margin, margin), "JS 테니스 랭킹 포인트", font=f_title, fill="#111111")
-    sub = f"{title_text} · 생성일 {date.today().strftime('%Y-%m-%d')}"
+    sub = f"{title_text} · 생성일 {today_kst().strftime('%Y-%m-%d')}"
     draw.text((margin, margin + title_h + 2 * scale), sub, font=f_sub, fill="#555555")
 
     top = margin + title_h + sub_h + 8 * scale
@@ -808,7 +814,7 @@ def apply_auto_promo_demotion(
         return players_df, []
 
     dfm = normalize_date_col(matches_df)
-    today = date.today()
+    today = today_kst()
 
     if window == "최근 30일":
         start = today.fromordinal(today.toordinal() - 30)
@@ -974,7 +980,9 @@ st.sidebar.markdown(
 )
 st.sidebar.caption("설정 / 규칙")
 
-auto_grade_enabled = st.sidebar.toggle("급수 자동 승급/강등 사용", value=True)
+# ✅ 기본 OFF: 자동 승급/강등이 급수를 바꾸면 점수 계산 기준이 계속 달라져
+#    랭킹 누적이 어긋나는 원인이 되므로, 필요할 때만 수동으로 켜서 사용
+auto_grade_enabled = st.sidebar.toggle("급수 자동 승급/강등 사용", value=False)
 
 st.sidebar.subheader("급수 자동 승급/강등 규칙")
 promo_mode = st.sidebar.radio("기준", ["점수", "승률"], horizontal=True)
@@ -1038,7 +1046,7 @@ def init_today_state():
     if "today_row_ids" not in st.session_state:
         st.session_state["today_row_ids"] = [_new_row_id(), _new_row_id(), _new_row_id()]
     if "today_date" not in st.session_state:
-        st.session_state["today_date"] = date.today()
+        st.session_state["today_date"] = today_kst()
     if "today_venue" not in st.session_state:
         st.session_state["today_venue"] = ""
 
@@ -1283,7 +1291,7 @@ with tabs[1]:
     with st.form("mobile_form", clear_on_submit=False):
         mcol1, mcol2 = st.columns([1, 1])
         with mcol1:
-            m_date = st.date_input("날짜", value=date.today(), key="m_date")
+            m_date = st.date_input("날짜", value=today_kst(), key="m_date")
         with mcol2:
             m_venue = st.text_input("장소/모임(선택)", value="", key="m_venue")
 
@@ -1467,7 +1475,7 @@ with tabs[0]:
 
         if mode == "전체 누적":
             cap_title = "전체 누적 랭킹"
-            cap_tag = f"total_{date.today()}"
+            cap_tag = f"total_{today_kst()}"
         else:
             cap_title = f"{selected_date} 랭킹 (오늘 승패점 기준)"
             cap_tag = str(selected_date)
@@ -1577,7 +1585,7 @@ with tabs[3]:
         df = matches_df.copy()
         years = sorted(pd.to_datetime(df["date"]).dt.year.unique().tolist())
         y = st.selectbox("연도", options=years, index=len(years)-1)
-        q = st.selectbox("분기", options=[1,2,3,4], index=(quarter_of(date.today())-1))
+        q = st.selectbox("분기", options=[1,2,3,4], index=(quarter_of(today_kst())-1))
         snap_mode = st.radio("스냅샷 기준", ["해당 분기만 집계", "해당 분기까지 누적"], horizontal=True)
 
         if snap_mode == "해당 분기만 집계":
@@ -1641,7 +1649,7 @@ with tabs[4]:
             }
         )
 
-        if st.button("수정/삭제 저장 (승점 자동 재계산)"):
+        if st.button("수정/삭제 저장 (수정된 행만 재계산, 나머지는 기록 당시 점수 유지)"):
             save_df = edited_matches.copy().reset_index(drop=True)
             if "삭제" not in save_df.columns:
                 save_df.insert(0, "삭제", False)
@@ -1653,8 +1661,40 @@ with tabs[4]:
             current_grade_map = dict(zip(current_players["name"], current_players["grade"]))
             current_names = set(current_players["name"].tolist())
 
+            # ✅ 기록 당시 점수 보존:
+            #    내용(날짜/장소/선수/게임수)이 바뀌지 않은 행은 재계산하지 않고 저장된 점수 그대로 유지.
+            #    수정되거나 새로 추가된 행만 현재 급수 기준으로 계산.
+            def _row_sig(d) -> tuple:
+                v = d.get("venue", "")
+                if v is None or (isinstance(v, float) and pd.isna(v)):
+                    v = ""
+                try:
+                    wg_ = int(float(d.get("winner_games", 0)))
+                    lg_ = int(float(d.get("loser_games", 0)))
+                except Exception:
+                    wg_, lg_ = -1, -1
+                return (
+                    str(d.get("date", "")).strip(),
+                    str(v).strip(),
+                    str(d.get("winner1", "")).strip(), str(d.get("winner2", "")).strip(),
+                    str(d.get("loser1", "")).strip(), str(d.get("loser2", "")).strip(),
+                    wg_, lg_,
+                )
+
+            orig_pool: dict[tuple, list[dict]] = {}
+            for _, om in matches_df.iterrows():
+                od = om.to_dict()
+                od["date"] = str(od.get("date", ""))
+                orig_pool.setdefault(_row_sig(od), []).append(od)
+
             for idx, m in save_df.iterrows():
                 try:
+                    pool = orig_pool.get(_row_sig(m))
+                    if pool:
+                        new_rows.append(pool.pop(0))  # 변경 없는 행 → 기록 당시 점수 유지
+                        continue
+
+                    # 수정/신규 행 → 검증 후 현재 급수로 계산
                     w1, w2 = str(m["winner1"]).strip(), str(m["winner2"]).strip()
                     l1, l2 = str(m["loser1"]).strip(), str(m["loser2"]).strip()
                     wg, lg = int(m["winner_games"]), int(m["loser_games"])
