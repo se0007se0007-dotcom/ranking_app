@@ -1,4 +1,4 @@
-﻿date,venue,winner1,winner2,loser1,loser2,winner_games,loser_games,winner_team_points,loser_team_points,team_diff,base_win_pt,base_lose_pt,score_bonus,final_win_pt,final_lose_pt
+date,venue,winner1,winner2,loser1,loser2,winner_games,loser_games,winner_team_points,loser_team_points,team_diff,base_win_pt,base_lose_pt,score_bonus,final_win_pt,final_lose_pt
 2026-07-04,낙생,배병운,김지수,송은정,신부영,6,5,19,21,2,2.0,-1.5,-0.2,1.5,-0.55
 2026-07-04,낙생,김지수,신부영,배병운,송은정,6,2,26,14,12,-1.5,2.0,0.1,0.25,-0.25
 2026-07-04,낙생,배병운,신부영,김지수,송은정,6,4,19,21,2,2.0,-1.5,-0.1,1.9,-1.4
@@ -60,3 +60,4 @@
 2026-08-10,,신부영,송은정,조중엽,서정수,6,3,21,22,1,1.75,-1.25,0.0,1.75,-1.25
 2026-08-10,,신부영,서정수,조중엽,송은정,6,1,28,15,13,-1.75,2.25,0.2,0.25,-0.25
 2026-08-10,,신부영,조중엽,서정수,송은정,6,5,20,23,3,2.25,-1.75,-0.2,2.05,-1.55
+2026-08-13,낙생대,송은정,김대원,이종찬,강시온,6,3,22,21,1,1.25,-0.75,0.0,1.25,-0.75
